@@ -5,8 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace MTMR_Filtering_CSharp {
-    class Program {
-        static void Main(string[] args) {
-        }
+    class PPMPGM_Utility {
     }
 }
