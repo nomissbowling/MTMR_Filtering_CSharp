@@ -82,7 +82,8 @@ namespace MTMR_Filtering_CSharp {
 				//アクセッサ更新
 				i += 1;
 			} //End_For
-			return value;
+			//マイナスの値が出てくるとうんち(どれくらいエッジになってるかわかればいいので方向情報は削除だ)
+			return Math.Abs(value);
 		} //End_Method
 	} //End_Class
 } //End_NameSpace
