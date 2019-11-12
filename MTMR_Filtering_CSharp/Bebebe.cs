@@ -29,27 +29,54 @@ namespace MTMR_Filtering_CSharp {
 		/// <summary>
 		/// 出力画像用(エッジ検出画像保存用 1チャネル．．．グレースケール)
 		/// </summary>
-		private Mat OutputImage;
+		private Mat[] OutputImage;
 
 		/// <summary>
 		///	PpmImageにかけたいフィルタ(複数できるように)
 		/// </summary>
-		private List<int[][]> Filters;
+		private List<float[][]> Filters;
+
+		/// <summary>
+		/// 平滑化フィルタ(ガウシアンフィルタ)
+		/// </summary>
+		private float[][] SmoothFilter;
+
+		/// <summary>
+		/// ラプラシアンフィルタ
+		/// </summary>
+		private float[][] LaplacianFilter;
+
+		/// <summary>
+		/// 各種画像の保存用の名前
+		/// </summary>
+		private string[] SaveNames;
+		
+		/// <summary>
+		/// フィルタ形成用
+		/// </summary>
+		private float[][] StrToIntArr2d(string str) {
+			return str.Split(';').Select(a => a.Split(' ').Select(b => float.Parse(b)).ToArray()).ToArray();
+		} //End_Method
 
 		/// <summary>
 		/// フィルタの初期化とか
 		/// </summary>
 		private void Initialize() {
-			//微分フィルタ(縦横2*2種類)，プリューウィットフィルタ(縦横2*2種類)，ソーベルフィルタ(縦横2*2種類)，ラプラシアンフィルタそれぞれ縦横(3x3)
-			int filterNum = 13;
+			//微分フィルタ(縦横2*2種類)，プリューウィットフィルタ(縦横2*2種類)，ソーベルフィルタ(縦横2*2種類)
+			int filterNum = 12;
+			//フィルタサイズ(3x3で固定)
             int size = 3;
-            this.Filters = new List<int[][]>(filterNum);
+
+			//変数初期化
+            this.Filters = new List<float[][]>(filterNum);
             for(int i = 0; i < this.Filters.Count; ++i) {
-                this.Filters[i] = new int[size][];
+                this.Filters[i] = new float[size][];
                 for(int j = 0; j < size; ++j) {
-                    this.Filters[i][j] = new int[size];
+                    this.Filters[i][j] = new float[size];
                 } //End_For
             } //End_For
+			this.SmoothFilter = new float[size][];
+			for(int i = 0; i < size; ++i) { this.SmoothFilter[i] = new float[size]; }
 
 			var filters = new string[filterNum];
 			//微分フィルタ横 右から左
@@ -76,10 +103,37 @@ namespace MTMR_Filtering_CSharp {
 			filters[10] = "1 2 1; 0 0 0; -1 -2 -1";
 			//ソーベルフィルタ縦 下から上
 			filters[11] = "-1 -2 -1; 0 0 0; 1 2 1";
+
+			//ガウシアンフィルタ
+			string gauss = "1 2 1; 2 4 2; 1 2 1";
+
 			//ラプラシアンフィルタ
-			filters[12] = "0 1 0; 1 -4 1; 0 1 0";
+			string lap = "0 1 0; 1 -4 1; 0 1 0";
+
+			//各種フィルタを値に変換
+			for (int i = 0; i < size; ++i) {
+				this.Filters[i] = this.StrToIntArr2d(filters[i]);
+			} //End_For
+			this.SmoothFilter = this.StrToIntArr2d(gauss);
+			this.SmoothFilter.Select(a => a.Select(b => b / 16).ToArray()).ToArray();
+			this.LaplacianFilter = this.StrToIntArr2d(lap);
 
 
+			//保存用の名前
+			this.SaveNames = new string[filterNum + 1];
+			this.SaveNames[0] = "DifferentialFilter_X_RightToLeft";
+			this.SaveNames[1] = "DifferentialFilter_X_LeftToRight";
+			this.SaveNames[2] = "DifferentialFilter_Y_TopToBottom";
+			this.SaveNames[3] = "DifferentialFilter_Y_BottomToTop";
+			this.SaveNames[4] = "PrewittFilter_X_RightToLeft";
+			this.SaveNames[5] = "PrewittFilter_X_LeftToRight";
+			this.SaveNames[6] = "PrewittFilter_Y_TopToBottom";
+			this.SaveNames[7] = "PrewittFilter_Y_BottomToTop";
+			this.SaveNames[8] = "SobelFilter_X_RightToLeft";
+			this.SaveNames[9] = "SobelFilter_X_LeftToRight";
+			this.SaveNames[10] = "SobelFilter_Y_TopToBottom";
+			this.SaveNames[11] = "SobelFilter_Y_BottomToTop";
+			this.SaveNames[this.SaveNames.Length - 1] = "LogFilter";
 		} //End_Method
 
 		/// <summary>
@@ -95,13 +149,32 @@ namespace MTMR_Filtering_CSharp {
 
 			//入力画像Open
 			Console.Write("入力画像ファイル名を入力（拡張子はなくて良い） : ");
-			var inputPath = Console.ReadLine();
+			var inputPath = Console.ReadLine() + ".ppm";
+			Console.WriteLine("入力画像 : " + inputPath);
 			bebebe.PpmImage = new Mat(inputPath);
 
 			//グレースケール化
 			bebebe.GrayImage = PPMPGM_Utility.MakeGrayImage(bebebe.PpmImage);
 
-			//フィルタリング処理
+			//出力用画像変数初期化
+			bebebe.OutputImage = new Mat[bebebe.Filters.Count + 1];
+
+			//フィルタリング処理(微分フィルタ，プリューウィットフィルタ，ソーベルフィルタ)
+			for(int i = 0; i < bebebe.Filters.Count - 1; ++i) {
+				bebebe.OutputImage[i] = PPMPGM_Utility.FilteringGrayScale(bebebe.GrayImage, bebebe.Filters[i]);
+			} //End_For
+
+			//フィルタリング処理(ガウシアンフィルタ → ラプラシアンフィルタ ≡ ログフィルタ)
+			bebebe.OutputImage[bebebe.OutputImage.Length - 1] = PPMPGM_Utility.FilteringGrayScale(bebebe.GrayImage, bebebe.SmoothFilter);
+			bebebe.OutputImage[bebebe.OutputImage.Length - 1] = PPMPGM_Utility.FilteringGrayScale(bebebe.OutputImage[bebebe.OutputImage.Length - 1], bebebe.LaplacianFilter);
+
+			//保存していく
+			Console.WriteLine("出力先パスを入力(ファイル名以下はなくて良い(つけると死ぬ)) : ");
+			var outputPath = Console.ReadLine();
+			Console.WriteLine("保存先 : " + outputPath);
+			for(int i = 0; i < bebebe.OutputImage.Length; ++i) {
+				bebebe.OutputImage[i].SaveImage(bebebe.SaveNames[i] + ".pgm");
+			} //End_For
 		} //End_Function
 	} //End_Class
 } //End_Namespace
