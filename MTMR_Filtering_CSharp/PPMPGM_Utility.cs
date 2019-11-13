@@ -46,7 +46,7 @@ namespace MTMR_Filtering_CSharp {
 		/// <param name="filter">かけたいフィルタ(任意のサイズ)</param>
 		/// <returns></returns>
 		public static Mat FilteringGrayScale(Mat img, float[][] filter) {
-			int filSize = (filter.Length - 1) / 2;  //はみ出るサイズ
+			FilSize = (filter.Length - 1) / 2;  //はみ出るサイズ
 			var mat = new Mat(img.Height, img.Width, MatType.CV_32S);
 			//各画素にフィルタリングしていく
 			for(int i = 0; i < img.Height; ++i) {
@@ -82,7 +82,7 @@ namespace MTMR_Filtering_CSharp {
 				//アクセッサ更新
 				i += 1;
 			} //End_For
-			//マイナスの値が出てくるとうんち(どれくらいエッジになってるかわかればいいので方向情報は削除だ)
+			  //マイナスの値が出てくるとうんち(どれくらいエッジになってるかわかればいいので方向情報は削除だ)
 			return Math.Abs((int)value);
 		} //End_Method
 	} //End_Class

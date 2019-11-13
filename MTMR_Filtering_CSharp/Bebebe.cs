@@ -13,6 +13,7 @@ using OpenCvSharp.Blob;
 using OpenCvSharp.CPlusPlus;
 using OpenCvSharp.Extensions;
 using OpenCvSharp.Utilities;
+using System.Text.RegularExpressions;
 
 namespace MTMR_Filtering_CSharp {
 	class Bebebe {
@@ -55,7 +56,8 @@ namespace MTMR_Filtering_CSharp {
 		/// フィルタ形成用
 		/// </summary>
 		private float[][] StrToIntArr2d(string str) {
-			return str.Split(';').Select(a => a.Split(' ').Select(b => float.Parse(b)).ToArray()).ToArray();
+			return Regex.Split(str, "; ").Select(a => a.Split(' ').Select(b => float.Parse(b)).ToArray()).ToArray();
+			//return str.Split(';').Select(a => a.Split(' ').Select(b => float.Parse(b)).ToArray()).ToArray();
 		} //End_Method
 
 		/// <summary>
@@ -68,9 +70,9 @@ namespace MTMR_Filtering_CSharp {
             int size = 3;
 
 			//変数初期化
-            this.Filters = new List<float[][]>(filterNum);
-            for(int i = 0; i < this.Filters.Count; ++i) {
-                this.Filters[i] = new float[size][];
+            this.Filters = new List<float[][]>();
+            for(int i = 0; i < filterNum; ++i) {
+                this.Filters.Add(new float[size][]);
                 for(int j = 0; j < size; ++j) {
                     this.Filters[i][j] = new float[size];
                 } //End_For
@@ -111,7 +113,7 @@ namespace MTMR_Filtering_CSharp {
 			string lap = "0 1 0; 1 -4 1; 0 1 0";
 
 			//各種フィルタを値に変換
-			for (int i = 0; i < size; ++i) {
+			for (int i = 0; i < filterNum; ++i) {
 				this.Filters[i] = this.StrToIntArr2d(filters[i]);
 			} //End_For
 			this.SmoothFilter = this.StrToIntArr2d(gauss);
@@ -143,6 +145,7 @@ namespace MTMR_Filtering_CSharp {
 		static void Main(string[] args) {
 			//使う変数とかここで宣言(下でもいいけど)
 			var bebebe = new Bebebe();
+			var ext = ".png";
 
 			//初期化
 			bebebe.Initialize();
@@ -151,30 +154,42 @@ namespace MTMR_Filtering_CSharp {
 			Console.Write("入力画像ファイル名を入力（拡張子はなくて良い） : ");
 			var inputPath = Console.ReadLine() + ".ppm";
 			Console.WriteLine("入力画像 : " + inputPath);
-			bebebe.PpmImage = new Mat(inputPath);
+			try {
+				bebebe.PpmImage = new Mat(inputPath);
+			}catch (Exception e) {
+				Console.WriteLine("入力画像のパスが死んでるかもね");
+				Console.WriteLine(e.ToString());
+			} //End_TryCatch
+
+			//先に出力先聞いといたほうがストレスレス(実行時間を待たなくてよいので)
+			Console.WriteLine("出力先パスを入力(ファイル名以下はなくて良い(つけると死ぬ)) : ");
+			var outputPath = Console.ReadLine() + "\\";
+			Console.WriteLine("保存先 : " + outputPath);
 
 			//グレースケール化
 			bebebe.GrayImage = PPMPGM_Utility.MakeGrayImage(bebebe.PpmImage);
+			bebebe.GrayImage.SaveImage(outputPath + "GrayScale"+ext);
 
 			//出力用画像変数初期化
 			bebebe.OutputImage = new Mat[bebebe.Filters.Count + 1];
 
 			//フィルタリング処理(微分フィルタ，プリューウィットフィルタ，ソーベルフィルタ)
-			for(int i = 0; i < bebebe.Filters.Count - 1; ++i) {
+			for(int i = 0; i < bebebe.Filters.Count; ++i) {
+				Console.WriteLine("処理始めますよ : " + bebebe.SaveNames[i] + ext);
 				bebebe.OutputImage[i] = PPMPGM_Utility.FilteringGrayScale(bebebe.GrayImage, bebebe.Filters[i]);
 			} //End_For
 
 			//フィルタリング処理(ガウシアンフィルタ → ラプラシアンフィルタ ≡ ログフィルタ)
+			Console.WriteLine("処理始めますよ : " + "LogFilter" + ext);Console.WriteLine();
 			bebebe.OutputImage[bebebe.OutputImage.Length - 1] = PPMPGM_Utility.FilteringGrayScale(bebebe.GrayImage, bebebe.SmoothFilter);
 			bebebe.OutputImage[bebebe.OutputImage.Length - 1] = PPMPGM_Utility.FilteringGrayScale(bebebe.OutputImage[bebebe.OutputImage.Length - 1], bebebe.LaplacianFilter);
 
 			//保存していく
-			Console.WriteLine("出力先パスを入力(ファイル名以下はなくて良い(つけると死ぬ)) : ");
-			var outputPath = Console.ReadLine();
-			Console.WriteLine("保存先 : " + outputPath);
 			for(int i = 0; i < bebebe.OutputImage.Length; ++i) {
-				bebebe.OutputImage[i].SaveImage(bebebe.SaveNames[i] + ".pgm");
+				var path = outputPath + bebebe.SaveNames[i] + ext;
+				Console.WriteLine("出力パス : " + path);
+				bebebe.OutputImage[i].SaveImage(path);
 			} //End_For
-		} //End_Function
+		} //End_Method
 	} //End_Class
 } //End_Namespace
